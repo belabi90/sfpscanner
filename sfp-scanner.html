@@ -1,0 +1,1075 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>SFP-Scanner</title>
+<style>
+:root{
+  --bg:#f3f6f5; --surface:#fff; --surface-2:#e9efee; --fg:#14201f; --muted:#5c6b69;
+  --line:#d4dedc; --accent:#0d8277; --accent-soft:#d7efec; --on-accent:#fff;
+  --ok:#1d7f49; --warn:#9a6500; --bad:#b3362a;
+  --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme:dark){
+  :root{
+    --bg:#0d1413; --surface:#161f1e; --surface-2:#1e2928; --fg:#e4eeec; --muted:#93a5a2;
+    --line:#273433; --accent:#3ed3c1; --accent-soft:#10302d; --on-accent:#06110f;
+    --ok:#4cc47c; --warn:#d9a33c; --bad:#ef7568;
+    color-scheme:dark;
+  }
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{
+  background:var(--bg); color:var(--fg);
+  font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  font-size:15px; line-height:1.5; -webkit-text-size-adjust:100%;
+  padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+}
+[hidden]{display:none!important}
+.top{position:sticky;top:0;z-index:9;background:var(--surface);border-bottom:1px solid var(--line)}
+.wrap{max-width:720px;margin:0 auto;
+  padding-left:max(16px,env(safe-area-inset-left,0px));
+  padding-right:max(16px,env(safe-area-inset-right,0px))}
+.top .wrap{padding-block:10px 0}
+h1{margin:0;font-size:17px;font-weight:600}
+.count{font-family:var(--mono);font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+.brand{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.tabs{display:flex;margin-top:10px}
+.tab{appearance:none;background:none;border:0;border-bottom:2px solid transparent;color:var(--muted);
+  font:inherit;font-weight:500;padding:8px 2px;margin-right:18px;cursor:pointer}
+.tab[aria-selected=true]{color:var(--fg);border-bottom-color:var(--accent)}
+main{max-width:720px;margin:0 auto;
+  padding-left:max(16px,env(safe-area-inset-left,0px));
+  padding-right:max(16px,env(safe-area-inset-right,0px));
+  padding-block:16px 60px;display:flex;flex-direction:column;gap:14px}
+h2{font-size:12px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:0}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px;
+  display:flex;flex-direction:column;gap:12px}
+.btn{appearance:none;display:inline-flex;align-items:center;justify-content:center;gap:8px;
+  min-height:46px;padding:0 16px;border-radius:8px;border:1px solid var(--line);
+  background:var(--surface-2);color:var(--fg);font:inherit;font-weight:500;cursor:pointer;text-align:center}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+.btn.danger{color:var(--bad);border-color:var(--bad);background:transparent}
+.btn.ghost{background:transparent}
+.btn[disabled]{opacity:.45}
+.btn-row{display:flex;gap:8px;flex-wrap:wrap}
+.btn-row>.btn{flex:1 1 150px}
+.field{display:flex;flex-direction:column;gap:5px;min-width:0}
+.lbl{font-size:12px;font-weight:600;color:var(--muted);letter-spacing:.03em}
+input[type=text],textarea,select{width:100%;min-width:0;font:inherit;padding:10px 12px;min-height:46px;
+  border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--fg)}
+textarea{min-height:66px;resize:vertical}
+#sn{font-family:var(--mono);font-size:16px;letter-spacing:.04em;text-transform:uppercase}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media (max-width:460px){.grid2{grid-template-columns:1fr}}
+.note{border-radius:8px;padding:10px 12px;font-size:13.5px;border:1px solid var(--line);background:var(--surface-2)}
+.note.good{border-color:var(--accent);background:var(--accent-soft)}
+.note.warn{border-color:var(--warn)}
+.note.bad{border-color:var(--bad)}
+.note b{font-family:var(--mono)}
+/* Kamera */
+.cam{position:relative;border-radius:10px;overflow:hidden;background:#000;aspect-ratio:4/3;max-width:100%}
+.cam video{width:100%;height:100%;object-fit:cover;display:block}
+.retic{position:absolute;left:12%;right:12%;top:30%;bottom:30%;border:2px solid rgba(255,255,255,.85);
+  border-radius:8px;box-shadow:0 0 0 2000px rgba(0,0,0,.28)}
+.retic.hit{border-color:#4cc47c}
+.camstat{position:absolute;left:0;right:0;bottom:0;padding:8px 12px;background:rgba(0,0,0,.6);
+  color:#fff;font-size:13px;font-family:var(--mono)}
+.switchrow{display:flex;align-items:center;gap:10px;font-size:14px}
+.switchrow input{width:22px;height:22px;accent-color:var(--accent)}
+/* Auswertung */
+.readout{display:flex;flex-wrap:wrap;gap:0 22px;margin:0}
+.readout div{display:flex;flex-direction:column}
+.readout dt{font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:var(--muted)}
+.readout dd{margin:0;font-family:var(--mono);font-size:15px;font-variant-numeric:tabular-nums}
+/* Zusammenfassung + Liste */
+.summary{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--line);
+  border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.summary button{appearance:none;border:0;cursor:pointer;font:inherit;background:var(--surface);color:var(--fg);
+  padding:10px 8px;display:flex;flex-direction:column;gap:2px;align-items:flex-start;border-top:3px solid transparent}
+.summary button[aria-pressed=true]{background:var(--surface-2);border-top-color:var(--accent)}
+.summary .n{font-family:var(--mono);font-size:20px;font-weight:600;font-variant-numeric:tabular-nums;line-height:1.1}
+.summary .k{font-size:11px;color:var(--muted)}
+@media (max-width:460px){.summary{grid-template-columns:repeat(2,1fr)}}
+.list{display:flex;flex-direction:column;gap:8px}
+.row{appearance:none;text-align:left;font:inherit;cursor:pointer;width:100%;background:var(--surface);
+  border:1px solid var(--line);border-left:3px solid var(--line);border-radius:8px;padding:11px 12px;
+  display:flex;flex-direction:column;gap:3px}
+.row.s-lager{border-left-color:var(--muted)}
+.row.s-verbaut{border-left-color:var(--ok)}
+.row.s-defekt{border-left-color:var(--bad)}
+.row.s-ausgegeben{border-left-color:var(--warn)}
+.row .sn{font-family:var(--mono);font-size:15px;font-weight:600;word-break:break-all}
+.row .meta{font-size:13px;color:var(--muted);display:flex;flex-wrap:wrap;gap:0 8px}
+.row .meta .pid{font-family:var(--mono);color:var(--fg)}
+.badge{font-size:11px;letter-spacing:.05em;text-transform:uppercase;font-weight:600;padding:2px 7px;
+  border-radius:4px;background:var(--surface-2);color:var(--muted)}
+.badge.verbaut{color:var(--ok)}.badge.defekt{color:var(--bad)}.badge.ausgegeben{color:var(--warn)}
+.empty{color:var(--muted);font-size:14px;padding:22px 4px;text-align:center}
+.empty strong{display:block;color:var(--fg);font-size:15px;margin-bottom:4px}
+.toolbar{display:flex;gap:8px;flex-wrap:wrap}
+.toolbar input{flex:2 1 180px}.toolbar select{flex:1 1 140px}
+.foot{font-size:12.5px;color:var(--muted);margin:0}
+.foot code{font-family:var(--mono)}
+.sess{display:flex;flex-direction:column;gap:6px}
+.sess div{font-family:var(--mono);font-size:13.5px;display:flex;gap:8px;align-items:baseline}
+.sess .tag{font-family:inherit;font-size:11px;text-transform:uppercase;letter-spacing:.05em;font-weight:600}
+.sess .new{color:var(--ok)}.sess .dup{color:var(--warn)}
+</style>
+</head>
+<body>
+
+<div class="top"><div class="wrap">
+  <div class="brand"><h1>SFP-Scanner</h1><span class="count" id="headcount">0 Module</span></div>
+  <div class="tabs" role="tablist">
+    <button class="tab" id="tab-scan" role="tab" aria-selected="true">Scannen</button>
+    <button class="tab" id="tab-list" role="tab" aria-selected="false">Bestand</button>
+    <button class="tab" id="tab-data" role="tab" aria-selected="false">Daten</button>
+  </div>
+</div></div>
+
+<main>
+<!-- SCANNEN -->
+<section id="view-scan" style="display:flex;flex-direction:column;gap:14px">
+
+  <div class="card">
+    <h2>Kamera</h2>
+    <div class="cam" id="camwrap" hidden>
+      <video id="video" playsinline muted></video>
+      <div class="retic" id="retic"></div>
+      <div class="camstat" id="camstat">Suche Code …</div>
+    </div>
+    <div class="btn-row">
+      <button type="button" class="btn primary" id="camstart">Kamera starten</button>
+      <button type="button" class="btn" id="camstop" hidden>Kamera stoppen</button>
+      <button type="button" class="btn" id="camswap" hidden>Kamera wechseln</button>
+    </div>
+    <div class="switchrow">
+      <input type="checkbox" id="auto" checked>
+      <label for="auto">Schnell-Modus: jeden erkannten Code sofort mit den Vorgaben unten speichern</label>
+    </div>
+    <div class="switchrow">
+      <input type="checkbox" id="movemode">
+      <label for="movemode">Umzugs-Modus: bekannte Module beim Scannen auf die Vorgaben umbuchen</label>
+    </div>
+    <div class="note" id="scan-msg" hidden></div>
+    <div class="note warn" id="raw-box" hidden>
+      <div id="raw-text" style="font-family:var(--mono);word-break:break-all;margin-bottom:8px"></div>
+      <div class="btn-row">
+        <button type="button" class="btn" id="raw-take">Trotzdem übernehmen</button>
+        <button type="button" class="btn ghost" id="raw-skip">Ignorieren</button>
+      </div>
+    </div>
+    <div class="note warn" id="dup-box" hidden>
+      <div id="dup-text" style="margin-bottom:8px"></div>
+      <div class="btn-row">
+        <button type="button" class="btn primary" id="dup-move">Auf Vorgaben umbuchen</button>
+        <button type="button" class="btn" id="dup-edit">Bearbeiten</button>
+      </div>
+      <div class="btn-row">
+        <button type="button" class="btn ghost" id="dup-same">Nichts ändern</button>
+        <button type="button" class="btn" id="dup-other">Anderes Modul</button>
+      </div>
+    </div>
+    <div class="sess" id="sess"></div>
+    <div class="btn-row" id="undo-row" hidden>
+      <button type="button" class="btn ghost" id="undo" style="flex:1 1 100%">Letzten Eintrag rückgängig</button>
+    </div>
+    <div class="btn-row">
+      <label class="btn ghost" for="pick-file" style="flex:1 1 100%">Stattdessen Foto auswählen</label>
+    </div>
+    <input id="pick-file" type="file" accept="image/*" hidden>
+  </div>
+
+  <form class="card" id="form" autocomplete="off">
+    <h2>Vorgaben &amp; Eintrag</h2>
+    <div class="note good" id="dup-msg" hidden></div>
+
+    <div class="field">
+      <label class="lbl" for="sn">Seriennummer</label>
+      <input type="text" id="sn" placeholder="z. B. AVD222997N1" spellcheck="false">
+    </div>
+    <dl class="readout" id="readout" hidden></dl>
+
+    <div class="grid2">
+      <div class="field">
+        <label class="lbl" for="pid">Typ / PID</label>
+        <input type="text" id="pid" list="pids" placeholder="SFP-10G-SR" spellcheck="false">
+        <datalist id="pids"></datalist>
+      </div>
+      <div class="field">
+        <label class="lbl" for="vendor">Hersteller</label>
+        <input type="text" id="vendor" list="vendors" placeholder="Cisco" spellcheck="false">
+        <datalist id="vendors">
+          <option value="Cisco"></option><option value="ADVA"></option><option value="Juniper"></option>
+          <option value="HPE"></option><option value="Finisar"></option><option value="FS.com"></option>
+          <option value="Flexoptix"></option><option value="Nokia"></option><option value="Huawei"></option>
+        </datalist>
+      </div>
+    </div>
+
+    <div class="grid2">
+      <div class="field">
+        <label class="lbl" for="status">Status</label>
+        <select id="status">
+          <option value="lager">Lager</option>
+          <option value="verbaut">Verbaut</option>
+          <option value="defekt">Defekt</option>
+          <option value="ausgegeben">Ausgegeben</option>
+        </select>
+      </div>
+      <div class="field">
+        <label class="lbl" for="location">Standort</label>
+        <input type="text" id="location" list="locs" placeholder="Lager Büro">
+        <datalist id="locs"></datalist>
+      </div>
+    </div>
+
+    <div class="grid2" id="port-fields">
+      <div class="field"><label class="lbl" for="device">Gerät / Switch</label>
+        <input type="text" id="device" list="devices" placeholder="z. B. Poseidon" spellcheck="false">
+        <datalist id="devices"></datalist></div>
+      <div class="field"><label class="lbl" for="port">Port</label>
+        <input type="text" id="port" placeholder="z. B. 4 oder Te1/0/24" spellcheck="false"></div>
+    </div>
+
+    <div class="field">
+      <label class="lbl" for="note">Notiz · Herkunft · Bestellung</label>
+      <textarea id="note" placeholder="Woher kommt das Modul, welche Lieferung, wofür reserviert"></textarea>
+    </div>
+
+    <div class="btn-row">
+      <button type="submit" class="btn primary" id="save">Speichern</button>
+      <button type="button" class="btn ghost" id="reset">Leeren</button>
+    </div>
+    <button type="button" class="btn danger" id="del" hidden>Diesen Eintrag löschen</button>
+    <div class="note bad" id="form-msg" hidden></div>
+  </form>
+
+  <p class="foot">Cisco-Seriennummern verraten das Baujahr: drei Buchstaben fürs Werk, dann Jahr und Kalenderwoche. <code>AVD<b>2229</b>97N1</code> heißt 2022, KW 29. Wann ihr das Modul gekauft habt, steht nicht drin — das gehört in die Notiz.</p>
+</section>
+
+<!-- BESTAND -->
+<section id="view-list" hidden style="flex-direction:column;gap:14px">
+  <div class="summary" id="summary"></div>
+  <div class="toolbar">
+    <input type="text" id="q" placeholder="Suchen: SN, Typ, Standort, Notiz" spellcheck="false">
+    <select id="floc"><option value="">Alle Standorte</option></select>
+  </div>
+  <div class="list" id="list"></div>
+</section>
+
+<!-- DATEN -->
+<section id="view-data" hidden style="flex-direction:column;gap:14px">
+  <div class="card">
+    <h2>Export</h2>
+    <p class="foot">Der Bestand liegt nur in diesem Browser auf diesem Handy. Exportiere regelmäßig, sonst ist er beim Löschen der Browserdaten weg.</p>
+    <div class="btn-row">
+      <button type="button" class="btn primary" id="xlsx">Excel-Datei (.xlsx)</button>
+      <button type="button" class="btn" id="csv">CSV</button>
+      <button type="button" class="btn" id="json">Sicherung (JSON)</button>
+    </div>
+  </div>
+  <div class="card">
+    <h2>Produktcodes aufräumen</h2>
+    <p class="foot">Sucht Einträge, deren Seriennummer in Wahrheit ein Produktcode ist — das sind die, die mehrfach vorkommen können. Sie werden gelöscht und künftig beim Scannen abgelehnt.</p>
+    <div class="btn-row">
+      <button type="button" class="btn" id="cleanscan">Verdächtige Einträge suchen</button>
+    </div>
+    <div class="note" id="clean-msg" hidden></div>
+    <div class="btn-row" id="clean-row" hidden>
+      <button type="button" class="btn danger" id="cleando" style="flex:1 1 100%">Gefundene löschen und sperren</button>
+    </div>
+  </div>
+  <div class="card">
+    <h2>Import</h2>
+    <p class="foot">Eine JSON-Sicherung wieder einlesen. Vorhandene Seriennummern werden überschrieben, alles andere kommt dazu.</p>
+    <div class="btn-row">
+      <label class="btn" for="imp" style="flex:1 1 100%">JSON-Datei wählen</label>
+    </div>
+    <input id="imp" type="file" accept="application/json,.json" hidden>
+    <div class="note" id="imp-msg" hidden></div>
+  </div>
+  <div class="card">
+    <h2>Diagnose</h2>
+    <div class="note" id="diag"></div>
+  </div>
+</section>
+</main>
+
+<script>
+(function(){
+"use strict";
+var KEY="sfp_inventar_v1";
+var STATUS={lager:"Lager",verbaut:"Verbaut",defekt:"Defekt",ausgegeben:"Ausgegeben"};
+var PIDS=["SFP-10G-SR","SFP-10G-LR","SFP-10G-LRM","SFP-10G-ER","SFP-H10GB-CU1M","SFP-H10GB-CU3M",
+"GLC-LH-SMD","GLC-SX-MMD","GLC-TE","GLC-BX-U","SFP-25G-SR-S","SFP-25G-LR-S",
+"QSFP-40G-SR4","QSFP-40G-LR4","QSFP-100G-SR4","QSFP-100G-LR4-S","QSFP-H40G-CU3M"];
+var SEED=[
+ {sn:"AVD222997N1",pid:"SFP-10G-SR",vendor:"Cisco",year:2022,week:29,note:"Vom Label-Foto 16.10.2026. Produktnummer 10-2415-03."},
+ {sn:"AVD222997M6",pid:"SFP-10G-SR",vendor:"Cisco",year:2022,week:29,note:"Vom Label-Foto 16.10.2026. Gleiche Charge wie AVD222997N1."},
+ {sn:"AVD22299SGY",pid:"SFP-10G-SR",vendor:"Cisco",year:2022,week:29,note:"Vom Label-Foto 16.10.2026. Produktnummer 10-2415-03."},
+ {sn:"AVJ20173A5C",pid:"GLC-LH-SMD",vendor:"Cisco",year:2020,week:17,note:"Vom Label-Foto 16.10.2026. Singlemode 1310 nm."},
+ {sn:"LBADVA70203101993",pid:"SFP/2G1/850I",vendor:"ADVA",year:null,week:null,note:"Vom Label-Foto 16.10.2026. Teilenummer 0061705844-03. Multimode LC."},
+ {sn:"LBADVA30164700163",pid:"SFP+CDR/11GU/1310S/SM/LC",vendor:"ADVA",year:null,week:null,note:"Vom Label-Foto 16.10.2026. Teilenummer 1061701863-01. Singlemode LC."}
+];
+var $=function(i){return document.getElementById(i);};
+var modules=[],editing=null,filterStatus="",stream=null,detector=null,scanning=false;
+var devices=[],devIdx=0,lastHit={},sessionLog=[],pendingRaw=null;
+var blocklist=[],pendingDup=null,lastSaved=null;
+
+/* ---------- Speicher ---------- */
+function load(){
+  try{
+    var raw=localStorage.getItem(KEY);
+    if(raw){
+      var o=JSON.parse(raw);
+      if(o&&Array.isArray(o.blocklist)) blocklist=o.blocklist.filter(function(x){return typeof x==="string";});
+      if(o&&Array.isArray(o.modules)) return o.modules;
+    }
+  }catch(e){}
+  return null;
+}
+function persist(){
+  try{
+    localStorage.setItem(KEY,JSON.stringify({v:1,savedAt:new Date().toISOString(),
+      modules:modules,blocklist:blocklist}));
+    return true;
+  }catch(e){ return false; }
+}
+function isBlocked(c){ return blocklist.indexOf(c)>=0; }
+function blockCode(c){
+  if(c&&!isBlocked(c)){ blocklist.push(c); persist(); }
+}
+
+/* ---------- Seriennummer ---------- */
+function normSn(v){ return String(v||"").toUpperCase().replace(/[^A-Z0-9._~:@+-]/g,""); }
+function isoWeekStart(y,w){
+  var jan4=new Date(Date.UTC(y,0,4)), dow=jan4.getUTCDay()||7;
+  return new Date(jan4.getTime()-(dow-1)*864e5+(w-1)*7*864e5);
+}
+function decodeSn(raw){
+  var s=normSn(raw); if(!s) return null;
+  var m=/^([A-Z]{3})(\d{2})(\d{2})([0-9A-Z]{4})$/.exec(s);
+  if(m){
+    var yy=+m[2], wk=+m[3], year=yy+(yy>70?1900:2000), nowY=new Date().getFullYear();
+    if(wk>=1&&wk<=53&&year>=1996&&year<=nowY)
+      return {scheme:"cisco",vendor:"Cisco",site:m[1],year:year,week:wk};
+  }
+  if(/^LBADVA/.test(s)) return {scheme:"adva",vendor:"ADVA"};
+  if(/^(FNS|FLX|AVG)/.test(s)) return {scheme:"other",vendor:"Finisar"};
+  return {scheme:"unknown",vendor:""};
+}
+function ageText(y,w){
+  var yrs=(Date.now()-isoWeekStart(y,w).getTime())/(365.25*864e5);
+  if(yrs<0) return "";
+  if(yrs<1) return "ca. "+Math.max(1,Math.round(yrs*12))+" Monate alt";
+  return "ca. "+yrs.toFixed(1).replace(".",",")+" Jahre alt";
+}
+/* Was auf Labels steht, aber nie eine Seriennummer ist */
+var NOT_SERIAL=[
+  {re:/^[A-Z0-9]{5}\d{4}$/, why:"Produktcode vom Label (steht klein neben dem Quadrat)"},
+  {re:/^V?UN\d{7,}$/, why:"UN-Nummer vom Label"},
+  {re:/^\d{2}-\d{4}-\d{2}$/, why:"Cisco-Produktnummer"},
+  {re:/^\d+$/, why:"reine Zahl, meist eine Zulassungsnummer"},
+  {re:/^\d{6}-\d{3}$/, why:"Ersatzteilnummer"},
+  {re:/^(21CFR|LN#?\d|CLASS|MADE|LASER|PRODUCT)/i, why:"Text vom Label"}
+];
+/* Teilenummern: gehören ins Typ-Feld, nicht ins Seriennummer-Feld */
+var PART_LIKE=[
+  /^(SFP|QSFP|GLC|X2|CVR|XFP)[A-Z0-9+.\/-]{2,}$/i,
+  /^FTL[A-Z0-9]{6,}$/i,
+  /^FN-TRAN/i,
+  /^QK\d{3}[A-Z]$/i,
+  /^\d{4}-\d{4}$/
+];
+function hits(list,c){
+  for(var i=0;i<list.length;i++){ var r=list[i].re||list[i]; if(r.test(c)) return list[i]; }
+  return null;
+}
+function vendorFrom(sn,part){
+  if(/^LBADVA/.test(sn)) return "ADVA";
+  if(/^[A-Z]{3}\d{4}[0-9A-Z]{4}$/.test(sn)) return "Cisco";
+  if(/^HAF/.test(sn)) return "HPE";
+  if(/^FN-TRAN/i.test(part)) return "Fortinet";
+  if(/^QK\d{3}/i.test(part)) return "HPE";
+  if(/^FTL/i.test(part)) return "Finisar";
+  return "";
+}
+function pickFromCode(text){
+  var out={sn:"",pid:"",vendor:"",from:"",why:""};
+  var s=String(text).replace(/[\x00-\x1f]/g," ").trim();
+
+  /* 1) Klammer-Kennungen nach Industriestandard: (S) Seriennummer, (1P) Teilenummer */
+  var re=/\(\s*(\d*[A-Z]{1,3})\s*\)\s*([^()\s]+)/g, m, ai={};
+  while((m=re.exec(s))) ai[m[1].toUpperCase()]=m[2];
+  if(ai["1P"]) out.pid=normSn(ai["1P"]);
+  if(ai.S){
+    out.sn=normSn(ai.S);
+    out.from="(S)-Feld";
+    out.vendor=vendorFrom(out.sn,out.pid);
+    return out;
+  }
+
+  /* 2) Einzelne Bestandteile prüfen */
+  var worst=null;
+  s.split(/[\s,;|]+/).filter(Boolean).forEach(function(t){
+    var c=normSn(t.replace(/^S\/?N[:=]?/i,""));
+    if(!c||c.length<5) return;
+    /* Manche Codes tragen vorne eine Kennung ohne Klammern, z. B. 1P vor der Teilenummer */
+    var cands=[c];
+    [c.replace(/^\d{0,2}[A-Z]{1,2}(?=\d)/,""), c.replace(/^S(?=[A-Z]{3}\d)/,"")].forEach(function(a){
+      if(a&&a!==c&&a.length>=5&&cands.indexOf(a)<0) cands.push(a);
+    });
+    var bad=null;
+    cands.forEach(function(x){ if(!bad) bad=hits(NOT_SERIAL,x); });
+    if(bad){ if(!worst) worst=bad.why; return; }
+    var part=null;
+    cands.forEach(function(x){ if(!part&&hits(PART_LIKE,x)) part=x; });
+    if(part){ if(!out.pid) out.pid=part; return; }
+    if(out.sn) return;
+    for(var k=0;k<cands.length;k++){
+      if(/^[A-Z]{3}\d{4}[0-9A-Z]{4}$/.test(cands[k])){ out.sn=cands[k]; out.from="Cisco-Muster"; return; }
+      if(/^LBADVA\d{6,}$/.test(cands[k])){ out.sn=cands[k]; out.from="ADVA-Muster"; return; }
+    }
+    /* alles andere: Buchstaben und Ziffern gemischt, 5 bis 20 Zeichen */
+    if(/^[0-9A-Z-]{5,20}$/.test(c)&&/[A-Z]/.test(c)&&/\d/.test(c)){ out.sn=c; out.from="Code"; }
+  });
+  if(!out.sn) out.why=worst||"Darin steckt nichts, was nach einer Seriennummer aussieht.";
+  out.vendor=vendorFrom(out.sn,out.pid);
+  return out;
+}
+function msg(el,text,kind){ el.className="note"+(kind?" "+kind:""); el.textContent=text; el.hidden=!text; }
+
+/* ---------- Kamera ---------- */
+function haveDetector(){ return "BarcodeDetector" in window; }
+async function makeDetector(){
+  var sup=await window.BarcodeDetector.getSupportedFormats();
+  var want=["data_matrix","code_128","qr_code","code_39","itf","pdf417","aztec"]
+    .filter(function(f){return sup.indexOf(f)>=0;});
+  if(!want.length) throw new Error("keine Formate");
+  return new window.BarcodeDetector({formats:want});
+}
+async function startCam(){
+  var box=$("scan-msg");
+  if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){
+    msg(box,"Dieser Browser gibt der Seite keine Kamera. Nimm den Weg über „Foto auswählen“.","warn"); return;
+  }
+  if(!window.isSecureContext){
+    msg(box,"Die Kamera braucht eine sichere Verbindung. Lokal geöffnete Dateien erlaubt Chrome auf dem Handy oft nicht — dann hilft nur, die Datei auf eine https-Adresse zu legen. Solange geht „Foto auswählen“.","warn");
+  }
+  try{
+    if(!detector&&haveDetector()) detector=await makeDetector();
+  }catch(e){ detector=null; }
+  if(!detector){
+    msg(box,"Dieses Gerät kann keine Codes lesen. Seriennummer bitte eintippen.","warn"); return;
+  }
+  try{
+    var constraints={video:{facingMode:{ideal:"environment"},width:{ideal:1920},height:{ideal:1080}},audio:false};
+    if(devices.length&&devices[devIdx]) constraints.video={deviceId:{exact:devices[devIdx].deviceId},width:{ideal:1920}};
+    stream=await navigator.mediaDevices.getUserMedia(constraints);
+  }catch(err){
+    var n=err&&err.name;
+    if(n==="NotAllowedError") msg(box,"Kamera abgelehnt. Im Browser bei dieser Seite die Kamera erlauben und noch einmal starten.","bad");
+    else if(n==="NotFoundError") msg(box,"Keine Kamera gefunden.","bad");
+    else msg(box,"Kamera ließ sich nicht öffnen ("+(n||"unbekannt")+"). Nimm „Foto auswählen“.","bad");
+    return;
+  }
+  var v=$("video"); v.srcObject=stream;
+  try{ await v.play(); }catch(e){}
+  $("camwrap").hidden=false; $("camstart").hidden=true; $("camstop").hidden=false;
+  msg(box,"",""); scanning=true; tick();
+  try{
+    var all=await navigator.mediaDevices.enumerateDevices();
+    devices=all.filter(function(d){return d.kind==="videoinput";});
+    $("camswap").hidden=devices.length<2;
+  }catch(e){}
+}
+function stopCam(){
+  scanning=false;
+  if(stream){ stream.getTracks().forEach(function(t){t.stop();}); stream=null; }
+  $("video").srcObject=null;
+  $("camwrap").hidden=true; $("camstart").hidden=false; $("camstop").hidden=true; $("camswap").hidden=true;
+}
+async function swapCam(){
+  if(!devices.length) return;
+  devIdx=(devIdx+1)%devices.length;
+  stopCam(); await startCam();
+}
+var lastScan=0;
+async function tick(){
+  if(!scanning) return;
+  var now=Date.now();
+  if(now-lastScan>250){
+    lastScan=now;
+    try{
+      var codes=await detector.detect($("video"));
+      if(codes&&codes.length) onCodes(codes.map(function(c){return c.rawValue;}).filter(Boolean));
+    }catch(e){}
+  }
+  requestAnimationFrame(tick);
+}
+function beep(ok){
+  try{ if(navigator.vibrate) navigator.vibrate(ok?60:[40,60,40]); }catch(e){}
+  try{
+    var C=window.AudioContext||window.webkitAudioContext; if(!C) return;
+    beep.ctx=beep.ctx||new C();
+    var o=beep.ctx.createOscillator(), g=beep.ctx.createGain();
+    o.frequency.value=ok?880:420; g.gain.value=.06;
+    o.connect(g); g.connect(beep.ctx.destination); o.start();
+    o.stop(beep.ctx.currentTime+0.09);
+  }catch(e){}
+}
+function flash(ok){
+  var r=$("retic"); r.classList.toggle("hit",!!ok);
+  setTimeout(function(){ r.classList.remove("hit"); },350);
+}
+function rejectCode(code,why){
+  pendingRaw=code;
+  $("raw-text").textContent=code+" — "+why;
+  $("raw-box").hidden=false;
+  beep(false); flash(false);
+  logSession(code,"dup","keine Seriennummer");
+}
+function onCodes(values){
+  for(var i=0;i<values.length;i++){
+    var raw=values[i];
+    var hit=pickFromCode(raw);
+    var key=hit.sn||normSn(raw);
+    if(!key||key.length<4) continue;
+    if(lastHit[key]&&Date.now()-lastHit[key]<2500) continue;
+    lastHit[key]=Date.now();
+    $("camstat").textContent=key;
+    if(isBlocked(key)){
+      rejectCode(key,"von dir als Produktcode markiert, nicht eindeutig.");
+      return;
+    }
+    if(!hit.sn){
+      rejectCode(normSn(raw),hit.why||"Darin steckt nichts, was nach einer Seriennummer aussieht.");
+      return;
+    }
+    $("raw-box").hidden=true; pendingRaw=null;
+    if($("auto").checked) quickSave(hit.sn,hit.pid,hit.vendor);
+    else { $("sn").value=hit.sn; if(hit.pid)$("pid").value=hit.pid;
+           if(hit.vendor&&!$("vendor").value)$("vendor").value=hit.vendor;
+           renderReadout(); checkDuplicate(); beep(true); flash(true); }
+    return;
+  }
+}
+function logSession(sn,kind,text){
+  sessionLog.unshift({sn:sn,kind:kind,text:text});
+  sessionLog=sessionLog.slice(0,12);
+  var box=$("sess"); box.innerHTML="";
+  sessionLog.forEach(function(e){
+    var d=document.createElement("div");
+    var t=document.createElement("span"); t.className="tag "+(e.kind==="new"?"new":"dup");
+    t.textContent=e.kind==="new"?"neu":"bekannt";
+    var s=document.createElement("span"); s.textContent=e.sn+(e.text?" · "+e.text:"");
+    d.appendChild(t); d.appendChild(s); box.appendChild(d);
+  });
+}
+function quickSave(sn,pid,vendor){
+  var exist=find(sn);
+  if(exist){
+    if($("movemode").checked){ applyPreset(exist); return; }
+    pendingDup={sn:sn,pid:pid,vendor:vendor};
+    $("dup-text").textContent=sn+" steht schon drin: "+(STATUS[exist.status]||exist.status)+
+      (exist.location?", "+exist.location:"")+(exist.device?" · "+exist.device:"")+
+      (exist.port?" Port "+exist.port:"")+". Vorgaben jetzt: "+(STATUS[$("status").value])+
+      ($("location").value.trim()?", "+$("location").value.trim():"")+".";
+    $("dup-box").hidden=false;
+    beep(false); flash(false);
+    return;
+  }
+  $("dup-box").hidden=true; pendingDup=null;
+  var info=decodeSn(sn), now=new Date().toISOString();
+  modules.push({
+    sn:sn, pid:pid||$("pid").value.trim().toUpperCase(),
+    vendor:vendor||$("vendor").value.trim()||(info&&info.vendor)||"",
+    status:$("status").value, location:$("location").value.trim(),
+    device:$("device").value.trim(), port:$("port").value.trim(), note:$("note").value.trim(),
+    year:info&&info.year?info.year:null, week:info&&info.week?info.week:null,
+    createdAt:now, updatedAt:now
+  });
+  lastSaved=sn; $("undo-row").hidden=false;
+  if(!persist()) msg($("scan-msg"),"Speichern im Browser fehlgeschlagen — exportiere sofort unter „Daten“.","bad");
+  beep(true); flash(true);
+  logSession(sn,"new",(info&&info.year?info.year+" KW"+info.week:"gespeichert"));
+  refresh();
+}
+function dupSame(){
+  if(!pendingDup) return;
+  logSession(pendingDup.sn,"dup","nichts geändert");
+  $("dup-box").hidden=true; pendingDup=null;
+}
+/* Bekanntes Modul auf die aktuellen Vorgaben umbuchen */
+function applyPreset(m){
+  var before=(STATUS[m.status]||m.status)+(m.location?", "+m.location:"");
+  m.history=Array.isArray(m.history)?m.history:[];
+  m.history.push({at:m.updatedAt||new Date().toISOString(),status:m.status,
+    location:m.location||"",device:m.device||"",port:m.port||""});
+  if(m.history.length>40) m.history=m.history.slice(-40);
+  m.status=$("status").value;
+  m.location=$("location").value.trim();
+  m.device=$("device").value.trim();
+  m.port=$("port").value.trim();
+  m.updatedAt=new Date().toISOString();
+  persist(); refresh();
+  var after=(STATUS[m.status]||m.status)+(m.location?", "+m.location:"")+
+    (m.device?" · "+m.device:"")+(m.port?" Port "+m.port:"");
+  logSession(m.sn,"new",before+" → "+after);
+  beep(true); flash(true);
+}
+function dupMove(){
+  if(!pendingDup) return;
+  var m=find(pendingDup.sn);
+  $("dup-box").hidden=true;
+  if(m) applyPreset(m);
+  pendingDup=null;
+}
+function dupEdit(){
+  if(!pendingDup) return;
+  var m=find(pendingDup.sn);
+  $("dup-box").hidden=true;
+  pendingDup=null;
+  if(m){ stopCam(); loadIntoForm(m); }
+}
+function dupOther(){
+  if(!pendingDup) return;
+  var code=pendingDup.sn;
+  blockCode(code);
+  var old=find(code);
+  if(old){
+    old.note=(old.note?old.note+" ":"")+"[Achtung: als Seriennummer wurde der Produktcode "+code+" erfasst — echte Seriennummer nachtragen]";
+    old.updatedAt=new Date().toISOString();
+    persist(); refresh();
+  }
+  $("dup-box").hidden=true; pendingDup=null;
+  logSession(code,"dup","als Produktcode markiert");
+  msg($("scan-msg"),code+" ist damit als Produktcode gesperrt. Such auf dem Label einen anderen Strichcode oder tipp die Seriennummer unten ein. Der alte Eintrag ist markiert und braucht auch noch die richtige Nummer.","warn");
+}
+function undoLast(){
+  if(!lastSaved) return;
+  var m=find(lastSaved);
+  if(m){ modules.splice(modules.indexOf(m),1); persist(); refresh(); }
+  logSession(lastSaved,"dup","rückgängig gemacht");
+  delete lastHit[lastSaved];
+  lastSaved=null; $("undo-row").hidden=true;
+}
+async function handlePhoto(file){
+  var box=$("scan-msg"); if(!file) return;
+  if(!haveDetector()){ msg(box,"Dieses Gerät kann Codes nicht aus dem Foto lesen. Seriennummer bitte eintippen.","warn"); return; }
+  msg(box,"Foto wird gelesen …","");
+  try{
+    if(!detector) detector=await makeDetector();
+    var bmp=await createImageBitmap(file);
+    var codes=await detector.detect(bmp);
+    if(bmp.close) bmp.close();
+    var vals=[]; codes.forEach(function(c){ if(c.rawValue&&vals.indexOf(c.rawValue)<0) vals.push(c.rawValue); });
+    if(!vals.length){ msg(box,"Kein Code erkannt. Näher ran, Label gerade halten, gut ausleuchten.","warn"); return; }
+    var usable=vals.filter(function(v){return pickFromCode(v).sn;});
+    var v=(usable.length?usable:vals)[0];
+    var hit=pickFromCode(v);
+    if(!hit.sn){
+      pendingRaw=normSn(v);
+      $("raw-text").textContent=pendingRaw+" — "+(hit.why||"keine Seriennummer erkennbar");
+      $("raw-box").hidden=false;
+      msg(box,"Code gelesen, aber keine Seriennummer darin.","warn");
+      return;
+    }
+    if(isBlocked(hit.sn)){
+      rejectCode(hit.sn,"von dir als Produktcode markiert, nicht eindeutig.");
+      msg(box,"Das ist ein Produktcode, keine Seriennummer.","warn");
+      return;
+    }
+    $("raw-box").hidden=true; pendingRaw=null;
+    $("sn").value=hit.sn;
+    if(hit.pid) $("pid").value=hit.pid;
+    renderReadout(); checkDuplicate();
+    msg(box,"Code gelesen.","good");
+  }catch(e){ msg(box,"Foto konnte nicht gelesen werden.","warn"); }
+}
+
+/* ---------- Formular ---------- */
+function find(sn){ var r=null; modules.forEach(function(m){ if(m.sn===sn) r=m; }); return r; }
+function renderReadout(){
+  var box=$("readout"), info=decodeSn($("sn").value);
+  box.innerHTML="";
+  if(!info||info.scheme==="unknown"){ box.hidden=true; return; }
+  var parts=[];
+  if(info.vendor) parts.push(["Hersteller",info.vendor]);
+  if(info.year){ parts.push(["Baujahr",String(info.year)]); parts.push(["Woche","KW "+info.week]); parts.push(["Alter",ageText(info.year,info.week)]); }
+  if(!parts.length){ box.hidden=true; return; }
+  parts.forEach(function(p){
+    var d=document.createElement("div"), dt=document.createElement("dt"), dd=document.createElement("dd");
+    dt.textContent=p[0]; dd.textContent=p[1]; d.appendChild(dt); d.appendChild(dd); box.appendChild(d);
+  });
+  box.hidden=false;
+  if(!$("vendor").value&&info.vendor) $("vendor").value=info.vendor;
+}
+function checkDuplicate(){
+  var sn=normSn($("sn").value);
+  if(!sn||editing===sn){ return; }
+  var hit=find(sn);
+  if(hit){
+    var d=hit.createdAt?new Date(hit.createdAt).toLocaleDateString("de-DE"):"";
+    msg($("dup-msg"),"Schon im Bestand (erfasst "+d+", "+(STATUS[hit.status]||hit.status)+(hit.location?" · "+hit.location:"")+"). Speichern überschreibt den Eintrag.","good");
+  } else $("dup-msg").hidden=true;
+}
+function togglePortFields(){ /* Gerät und Port sind immer sichtbar */ }
+function clearForm(){
+  editing=null; $("form").reset(); $("del").hidden=true;
+  $("readout").hidden=true; $("dup-msg").hidden=true; $("form-msg").hidden=true;
+  togglePortFields();
+}
+function loadIntoForm(m){
+  editing=m.sn;
+  $("sn").value=m.sn||""; $("pid").value=m.pid||""; $("vendor").value=m.vendor||"";
+  $("status").value=STATUS[m.status]?m.status:"lager"; $("location").value=m.location||"";
+  $("device").value=m.device||""; $("port").value=m.port||""; $("note").value=m.note||"";
+  $("del").hidden=false; togglePortFields(); renderReadout();
+  var d=m.createdAt?new Date(m.createdAt).toLocaleDateString("de-DE"):"";
+  var txt="Bearbeiten: erfasst "+d+".";
+  if(Array.isArray(m.history)&&m.history.length){
+    var h=m.history.slice(-3).reverse().map(function(e){
+      return new Date(e.at).toLocaleDateString("de-DE")+": "+(STATUS[e.status]||e.status)+
+        (e.location?", "+e.location:"")+(e.device?" · "+e.device:"")+(e.port?" Port "+e.port:"");
+    });
+    txt+=" Vorher — "+h.join(" | ");
+  }
+  msg($("dup-msg"),txt,"good");
+  show("scan"); window.scrollTo({top:0,behavior:"smooth"});
+}
+function save(e){
+  e.preventDefault();
+  var sn=normSn($("sn").value);
+  if(!sn){ msg($("form-msg"),"Ohne Seriennummer geht es nicht — sie ist der Schlüssel für jedes Modul.","bad"); return; }
+  if(sn.length<4){ msg($("form-msg"),"Die Seriennummer sieht zu kurz aus. Bitte prüfen.","bad"); return; }
+  var info=decodeSn(sn), now=new Date().toISOString(), prev=find(sn);
+  var doc={
+    sn:sn, pid:$("pid").value.trim().toUpperCase(), vendor:$("vendor").value.trim()||(info&&info.vendor)||"",
+    status:$("status").value, location:$("location").value.trim(),
+    device:$("device").value.trim(), port:$("port").value.trim(), note:$("note").value.trim(),
+    year:info&&info.year?info.year:null, week:info&&info.week?info.week:null,
+    createdAt:prev&&prev.createdAt?prev.createdAt:now, updatedAt:now
+  };
+  if(prev){
+    var hist=Array.isArray(prev.history)?prev.history.slice():[];
+    if(prev.status!==doc.status||prev.location!==doc.location||prev.device!==doc.device||prev.port!==doc.port){
+      hist.push({at:prev.updatedAt||now,status:prev.status,location:prev.location||"",
+        device:prev.device||"",port:prev.port||""});
+    }
+    doc.history=hist.slice(-40);
+    modules[modules.indexOf(prev)]=doc;
+  } else modules.push(doc);
+  if(editing&&editing!==sn){ var old=find(editing); if(old) modules.splice(modules.indexOf(old),1); }
+  if(!persist()){ msg($("form-msg"),"Der Browser konnte nicht speichern. Exportiere unter „Daten“ und gib Speicher frei.","bad"); return; }
+  clearForm(); refresh();
+  msg($("scan-msg"),sn+" gespeichert.","good");
+}
+function removeEntry(){
+  if(!editing) return;
+  var b=$("del");
+  if(b.dataset.armed!=="1"){
+    b.dataset.armed="1"; b.textContent="Wirklich löschen? Noch einmal tippen";
+    setTimeout(function(){ b.dataset.armed=""; b.textContent="Diesen Eintrag löschen"; },4000);
+    return;
+  }
+  var m=find(editing); if(m) modules.splice(modules.indexOf(m),1);
+  persist(); var gone=editing; clearForm(); refresh();
+  msg($("scan-msg"),gone+" gelöscht.","");
+  b.dataset.armed=""; b.textContent="Diesen Eintrag löschen";
+}
+
+/* ---------- Listen ---------- */
+function esc(s){ return String(s).replace(/[&<>"]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c];}); }
+function allLocations(){
+  var a=[]; modules.forEach(function(m){ if(m.location&&a.indexOf(m.location)<0) a.push(m.location); });
+  a.sort(function(x,y){return x.localeCompare(y,"de");}); return a;
+}
+function fillDatalists(){
+  var all=PIDS.slice();
+  modules.forEach(function(m){ if(m.pid&&all.indexOf(m.pid)<0) all.push(m.pid); });
+  var dl=$("pids"); dl.innerHTML="";
+  all.forEach(function(p){ var o=document.createElement("option"); o.value=p; dl.appendChild(o); });
+  var locs=allLocations(), dl2=$("locs"); dl2.innerHTML="";
+  locs.forEach(function(l){ var o=document.createElement("option"); o.value=l; dl2.appendChild(o); });
+  var devs=[]; modules.forEach(function(m){ if(m.device&&devs.indexOf(m.device)<0) devs.push(m.device); });
+  devs.sort(function(x,y){return x.localeCompare(y,"de");});
+  var dl3=$("devices"); dl3.innerHTML="";
+  devs.forEach(function(d){ var o=document.createElement("option"); o.value=d; dl3.appendChild(o); });
+  var sel=$("floc"), keep=sel.value;
+  sel.innerHTML='<option value="">Alle Standorte</option>';
+  locs.forEach(function(l){ var o=document.createElement("option"); o.value=l; o.textContent=l; sel.appendChild(o); });
+  sel.value=keep;
+}
+function renderSummary(){
+  var c={lager:0,verbaut:0,defekt:0,ausgegeben:0};
+  modules.forEach(function(m){ if(c[m.status]!==undefined) c[m.status]++; });
+  var box=$("summary"); box.innerHTML="";
+  Object.keys(STATUS).forEach(function(k){
+    var b=document.createElement("button");
+    b.type="button"; b.setAttribute("aria-pressed",filterStatus===k?"true":"false");
+    var n=document.createElement("span"); n.className="n"; n.textContent=c[k];
+    var l=document.createElement("span"); l.className="k"; l.textContent=STATUS[k];
+    b.appendChild(n); b.appendChild(l);
+    b.addEventListener("click",function(){ filterStatus=filterStatus===k?"":k; renderSummary(); renderList(); });
+    box.appendChild(b);
+  });
+  $("headcount").textContent=modules.length+" Module · "+c.lager+" im Lager";
+}
+function renderList(){
+  var box=$("list"), q=$("q").value.trim().toLowerCase(), loc=$("floc").value;
+  var rows=modules.filter(function(m){
+    if(filterStatus&&m.status!==filterStatus) return false;
+    if(loc&&m.location!==loc) return false;
+    if(!q) return true;
+    return [m.sn,m.pid,m.vendor,m.location,m.device,m.port,m.note,String(m.year||"")].join(" ").toLowerCase().indexOf(q)>=0;
+  });
+  rows.sort(function(a,b){ return String(b.updatedAt||"").localeCompare(String(a.updatedAt||"")); });
+  box.innerHTML="";
+  if(!rows.length){
+    var e=document.createElement("div"); e.className="empty";
+    if(!modules.length) e.innerHTML="<strong>Noch kein Modul erfasst</strong>Kamera starten und das Label vor die Linse halten.";
+    else e.innerHTML="<strong>Nichts gefunden</strong>Suche oder Filter zurücksetzen.";
+    box.appendChild(e); return;
+  }
+  rows.forEach(function(m){
+    var b=document.createElement("button");
+    b.type="button"; b.className="row s-"+(STATUS[m.status]?m.status:"lager");
+    var sn=document.createElement("span"); sn.className="sn"; sn.textContent=m.sn;
+    var meta=document.createElement("span"); meta.className="meta";
+    var bits=[];
+    if(m.pid) bits.push('<span class="pid">'+esc(m.pid)+'</span>');
+    if(m.vendor) bits.push(esc(m.vendor));
+    if(m.year) bits.push(m.year+" KW"+(m.week||"?"));
+    if(m.location) bits.push(esc(m.location));
+    if(m.status==="verbaut"&&(m.device||m.port)) bits.push(esc([m.device,m.port].filter(Boolean).join(" · ")));
+    bits.push('<span class="badge '+m.status+'">'+(STATUS[m.status]||esc(m.status))+'</span>');
+    meta.innerHTML=bits.join(" · ");
+    b.appendChild(sn); b.appendChild(meta);
+    b.addEventListener("click",function(){ loadIntoForm(m); });
+    box.appendChild(b);
+  });
+}
+function refresh(){ fillDatalists(); renderSummary(); renderList(); }
+
+/* ---------- Export / Import ---------- */
+function download(name,text,mime){
+  var blob=new Blob([text],{type:mime||"text/plain;charset=utf-8"});
+  var url=URL.createObjectURL(blob);
+  var a=document.createElement("a"); a.href=url; a.download=name;
+  document.body.appendChild(a); a.click();
+  setTimeout(function(){ URL.revokeObjectURL(url); a.remove(); },1500);
+}
+function exportCsv(){
+  var head=["Seriennummer","Typ","Hersteller","Baujahr","KW","Status","Standort","Gerät","Port","Notiz","Erfasst","Geändert"];
+  var lines=[head.join(";")];
+  modules.slice().sort(function(a,b){return a.sn.localeCompare(b.sn);}).forEach(function(m){
+    lines.push([m.sn,m.pid,m.vendor,m.year||"",m.week||"",STATUS[m.status]||m.status,m.location,m.device,m.port,m.note,
+      m.createdAt?m.createdAt.slice(0,10):"",m.updatedAt?m.updatedAt.slice(0,10):""]
+      .map(function(v){ return '"'+String(v==null?"":v).replace(/"/g,'""')+'"'; }).join(";"));
+  });
+  download("sfp-inventar-"+new Date().toISOString().slice(0,10)+".csv","﻿"+lines.join("\r\n"),"text/csv;charset=utf-8");
+}
+/* ---------- Excel (.xlsx) ohne Bibliothek ---------- */
+var CRC=(function(){ var t=[],c,n,k;
+  for(n=0;n<256;n++){ c=n; for(k=0;k<8;k++) c=(c&1)?(0xEDB88320^(c>>>1)):(c>>>1); t[n]=c>>>0; }
+  return function(bytes){ var crc=0xFFFFFFFF;
+    for(var i=0;i<bytes.length;i++) crc=(crc>>>8)^t[(crc^bytes[i])&0xFF];
+    return (crc^0xFFFFFFFF)>>>0; };
+})();
+function utf8(s){ return new TextEncoder().encode(s); }
+function zip(files){
+  /* ZIP ohne Kompression (stored) — Excel liest das anstandslos */
+  var parts=[],central=[],offset=0;
+  function u16(n){ return [n&255,(n>>8)&255]; }
+  function u32(n){ return [n&255,(n>>8)&255,(n>>16)&255,(n>>24)&255]; }
+  files.forEach(function(f){
+    var name=utf8(f.name), data=utf8(f.data), crc=CRC(data);
+    var local=[].concat([80,75,3,4],u16(20),u16(0),u16(0),u16(0),u16(0),
+      u32(crc),u32(data.length),u32(data.length),u16(name.length),u16(0));
+    parts.push(new Uint8Array(local),name,data);
+    central.push([].concat([80,75,1,2],u16(20),u16(20),u16(0),u16(0),u16(0),u16(0),
+      u32(crc),u32(data.length),u32(data.length),u16(name.length),
+      u16(0),u16(0),u16(0),u16(0),u32(0),u32(offset)));
+    central[central.length-1].name=name;
+    offset+=local.length+name.length+data.length;
+  });
+  var cstart=offset, csize=0;
+  central.forEach(function(c){ parts.push(new Uint8Array(c),c.name); csize+=c.length+c.name.length; });
+  parts.push(new Uint8Array([].concat([80,75,5,6],u16(0),u16(0),
+    u16(files.length),u16(files.length),u32(csize),u32(cstart),u16(0))));
+  return new Blob(parts,{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"});
+}
+function xesc(s){ return String(s==null?"":s).replace(/[&<>]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;"}[c];}); }
+function colName(i){ var s=""; i++; while(i>0){ var m=(i-1)%26; s=String.fromCharCode(65+m)+s; i=(i-m-1)/26; } return s; }
+function sheetXml(rows){
+  var out='<?xml version="1.0" encoding="UTF-8"?>'+
+    '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'+
+    '<sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews>'+
+    '<cols><col min="1" max="1" width="22"/><col min="2" max="2" width="26"/><col min="3" max="3" width="12"/>'+
+    '<col min="4" max="5" width="9"/><col min="6" max="6" width="13"/><col min="7" max="9" width="20"/>'+
+    '<col min="10" max="10" width="40"/><col min="11" max="12" width="12"/></cols><sheetData>';
+  rows.forEach(function(r,ri){
+    out+='<row r="'+(ri+1)+'">';
+    r.forEach(function(v,ci){
+      var ref=colName(ci)+(ri+1);
+      if(typeof v==="number") out+='<c r="'+ref+'"><v>'+v+'</v></c>';
+      else out+='<c r="'+ref+'" t="inlineStr"><is><t xml:space="preserve">'+xesc(v)+'</t></is></c>';
+    });
+    out+='</row>';
+  });
+  return out+'</sheetData></worksheet>';
+}
+function exportXlsx(){
+  var rows=[["Seriennummer","Typ","Hersteller","Baujahr","KW","Status","Standort","Gerät","Port","Notiz","Erfasst","Geändert"]];
+  modules.slice().sort(function(a,b){return a.sn.localeCompare(b.sn);}).forEach(function(m){
+    rows.push([m.sn,m.pid||"",m.vendor||"",m.year||"",m.week||"",STATUS[m.status]||m.status,
+      m.location||"",m.device||"",m.port||"",m.note||"",
+      m.createdAt?m.createdAt.slice(0,10):"",m.updatedAt?m.updatedAt.slice(0,10):""]);
+  });
+  var blob=zip([
+    {name:"[Content_Types].xml",data:'<?xml version="1.0" encoding="UTF-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/></Types>'},
+    {name:"_rels/.rels",data:'<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>'},
+    {name:"xl/workbook.xml",data:'<?xml version="1.0" encoding="UTF-8"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="SFP-Bestand" sheetId="1" r:id="rId1"/></sheets></workbook>'},
+    {name:"xl/_rels/workbook.xml.rels",data:'<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/></Relationships>'},
+    {name:"xl/worksheets/sheet1.xml",data:sheetXml(rows)}
+  ]);
+  var url=URL.createObjectURL(blob);
+  var a=document.createElement("a");
+  a.href=url; a.download="sfp-inventar-"+new Date().toISOString().slice(0,10)+".xlsx";
+  document.body.appendChild(a); a.click();
+  setTimeout(function(){ URL.revokeObjectURL(url); a.remove(); },1500);
+}
+function exportJson(){
+  download("sfp-inventar-"+new Date().toISOString().slice(0,10)+".json",
+    JSON.stringify({v:1,savedAt:new Date().toISOString(),modules:modules,blocklist:blocklist},null,2),"application/json");
+}
+function importJson(file){
+  var box=$("imp-msg"); if(!file) return;
+  var fr=new FileReader();
+  fr.onload=function(){
+    try{
+      var o=JSON.parse(fr.result);
+      var list=Array.isArray(o)?o:(o&&o.modules);
+      if(!Array.isArray(list)) throw new Error("Format");
+      if(o&&Array.isArray(o.blocklist)) o.blocklist.forEach(function(c){ if(typeof c==="string") blockCode(c); });
+      var added=0,updated=0;
+      list.forEach(function(r){
+        if(!r||!r.sn) return;
+        var sn=normSn(r.sn), prev=find(sn);
+        var rec={sn:sn,pid:r.pid||"",vendor:r.vendor||"",status:STATUS[r.status]?r.status:"lager",
+          location:r.location||"",device:r.device||"",port:r.port||"",note:r.note||"",
+          year:r.year||null,week:r.week||null,
+          createdAt:r.createdAt||new Date().toISOString(),updatedAt:r.updatedAt||new Date().toISOString()};
+        if(prev){ modules[modules.indexOf(prev)]=rec; updated++; } else { modules.push(rec); added++; }
+      });
+      persist(); refresh();
+      msg(box,added+" neu, "+updated+" überschrieben.","good");
+    }catch(e){ msg(box,"Die Datei ließ sich nicht lesen. Es muss eine Sicherung aus dieser App sein.","bad"); }
+  };
+  fr.readAsText(file);
+}
+/* ---------- Produktcodes aufräumen ---------- */
+var cleanFound=[];
+function cleanScan(){
+  cleanFound=modules.filter(function(m){ return !!hits(NOT_SERIAL,m.sn); });
+  var box=$("clean-msg");
+  if(!cleanFound.length){
+    msg(box,"Nichts gefunden — alle Seriennummern sehen sauber aus.","good");
+    $("clean-row").hidden=true;
+    return;
+  }
+  msg(box,cleanFound.length+" verdächtige Einträge: "+cleanFound.map(function(m){return m.sn;}).join(", "),"warn");
+  $("clean-row").hidden=false;
+}
+function cleanDo(){
+  if(!cleanFound.length) return;
+  cleanFound.forEach(function(m){
+    blockCode(m.sn);
+    var i=modules.indexOf(m);
+    if(i>=0) modules.splice(i,1);
+  });
+  var n=cleanFound.length;
+  cleanFound=[];
+  persist(); refresh();
+  msg($("clean-msg"),n+" Einträge gelöscht und gesperrt. Diese Codes werden beim Scannen nicht mehr als Seriennummer genommen.","good");
+  $("clean-row").hidden=true;
+}
+function diag(){
+  var l=[];
+  l.push("Code-Leser: "+(haveDetector()?"vorhanden":"fehlt"));
+  l.push("Kamera-API: "+(navigator.mediaDevices&&navigator.mediaDevices.getUserMedia?"vorhanden":"fehlt"));
+  l.push("Sichere Verbindung: "+(window.isSecureContext?"ja":"nein — Kamera wird wahrscheinlich blockiert"));
+  var ls="nein"; try{ localStorage.setItem("__t","1"); localStorage.removeItem("__t"); ls="ja"; }catch(e){}
+  l.push("Speicher im Browser: "+ls);
+  msg($("diag"),l.join(" · "),window.isSecureContext&&haveDetector()?"good":"warn");
+}
+
+/* ---------- Reiter ---------- */
+function show(w){
+  [["scan","view-scan"],["list","view-list"],["data","view-data"]].forEach(function(p){
+    var on=p[0]===w, sec=$(p[1]);
+    sec.hidden=!on; sec.style.display=on?"flex":"none";
+    $("tab-"+p[0]).setAttribute("aria-selected",on?"true":"false");
+  });
+  if(w==="list") renderList();
+  if(w==="data") diag();
+}
+
+/* ---------- Start ---------- */
+$("tab-scan").addEventListener("click",function(){ show("scan"); });
+$("tab-list").addEventListener("click",function(){ show("list"); });
+$("tab-data").addEventListener("click",function(){ show("data"); });
+$("camstart").addEventListener("click",startCam);
+$("camstop").addEventListener("click",stopCam);
+$("camswap").addEventListener("click",swapCam);
+$("pick-file").addEventListener("change",function(e){ handlePhoto(e.target.files[0]); e.target.value=""; });
+$("raw-take").addEventListener("click",function(){
+  if(!pendingRaw) return;
+  $("sn").value=pendingRaw; renderReadout(); checkDuplicate();
+  $("raw-box").hidden=true; pendingRaw=null;
+  $("sn").scrollIntoView({block:"center",behavior:"smooth"});
+});
+$("raw-skip").addEventListener("click",function(){ $("raw-box").hidden=true; pendingRaw=null; });
+$("dup-same").addEventListener("click",dupSame);
+$("dup-other").addEventListener("click",dupOther);
+$("dup-move").addEventListener("click",dupMove);
+$("dup-edit").addEventListener("click",dupEdit);
+$("undo").addEventListener("click",undoLast);
+$("xlsx").addEventListener("click",exportXlsx);
+$("cleanscan").addEventListener("click",cleanScan);
+$("cleando").addEventListener("click",cleanDo);
+$("sn").addEventListener("input",renderReadout);
+$("sn").addEventListener("blur",checkDuplicate);
+$("status").addEventListener("change",togglePortFields);
+$("form").addEventListener("submit",save);
+$("reset").addEventListener("click",clearForm);
+$("del").addEventListener("click",removeEntry);
+$("q").addEventListener("input",renderList);
+$("floc").addEventListener("change",renderList);
+$("csv").addEventListener("click",exportCsv);
+$("json").addEventListener("click",exportJson);
+$("imp").addEventListener("change",function(e){ importJson(e.target.files[0]); e.target.value=""; });
+window.addEventListener("pagehide",stopCam);
+
+var stored=load();
+if(stored){ modules=stored; }
+else{
+  var now=new Date().toISOString();
+  modules=SEED.map(function(s){
+    return {sn:s.sn,pid:s.pid,vendor:s.vendor,status:"lager",location:"Lager Büro",
+      device:"",port:"",note:s.note,year:s.year,week:s.week,createdAt:now,updatedAt:now};
+  });
+  persist();
+}
+$("location").value="Lager Büro";
+togglePortFields();
+refresh();
+})();
+</script>
+</body>
+</html>
